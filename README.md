@@ -96,21 +96,6 @@ September was chosen to avoid monsoon cloud cover and fresh snow effects on clas
 - Sentinel-2 (10m) benefits OBIA more than pixel-based, while Landsat-8 (30m) suits pixel-based RF better
 - Resolution-context compatibility is critical — classifier choice must align with both the dataset resolution and classification framework
 
----
-
-## Repository Structure
-
-```
-├── gee_pixel_based/
-│   ├── landsat8_classification.js     # RF, SVM, kNN on Landsat-8
-│   └── sentinel2_classification.js   # RF, SVM, kNN on Sentinel-2
-├── outputs/
-│   ├── accuracy_results.csv          # OA and Kappa for all combinations
-│   └── maps/                         # Exported classification rasters
-└── README.md
-```
-
----
 
 ## Publication
 
