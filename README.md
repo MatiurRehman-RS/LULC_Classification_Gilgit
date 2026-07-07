@@ -5,7 +5,6 @@ Assessing the Efficacy of Pixel-based and Object-based Classification Techniques
 > Pixel-based vs. Object-based Image Analysis (OBIA) using Random Forest, SVM, and k-NN on Landsat-8 and Sentinel-2 imagery in Google Earth Engine.
 > **Published:** IJIST, vol. 7(9), pp. 42–56, July 2025
 
----
 
 ## Overview
 
