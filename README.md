@@ -63,30 +63,7 @@ September was chosen to avoid monsoon cloud cover and fresh snow effects on clas
 - Same classifiers (RF, SVM, k-NN) applied on segmented objects
 - Same accuracy assessment metrics
 
----
 
-## Results
-
-### Overall Accuracy and Kappa Coefficient
-
-| Method | Classifier | Dataset | OA (%) | Kappa |
-|---|---|---|---|---|
-| Pixel-based | **RF** | Landsat-8 | **82.9** | **0.796** |
-| Pixel-based | SVM | Landsat-8 | 81.3 | 0.777 |
-| Pixel-based | k-NN | Landsat-8 | 78.9 | 0.747 |
-| Pixel-based | RF | Sentinel-2 | 78.0 | 0.737 |
-| Pixel-based | SVM | Sentinel-2 | 76.4 | 0.719 |
-| Pixel-based | k-NN | Sentinel-2 | 72.4 | 0.666 |
-| OBIA | k-NN | Landsat-8 | 81.3 | 0.777 |
-| OBIA | SVM | Landsat-8 | 77.2 | 0.728 |
-| OBIA | RF | Landsat-8 | 73.2 | 0.676 |
-| OBIA | **k-NN** | **Sentinel-2** | **83.6** | **0.800** |
-| OBIA | RF | Sentinel-2 | 75.6 | 0.711 |
-| OBIA | SVM | Sentinel-2 | 72.4 | 0.665 |
-
-**Key finding:** OBIA with k-NN on Sentinel-2 achieved the highest overall accuracy (83.6%, Kappa 0.80). Pixel-based RF performed best among pixel-based approaches on Landsat-8 (82.9%, Kappa 0.796).
-
----
 
 ## Key Findings
 
