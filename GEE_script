@@ -1,0 +1,238 @@
+// ============================================================
+// Pixel-based LULC Classification — Landsat-8 OLI
+// Study Area: Gilgit District, Pakistan
+// Paper: Rehman et al., IJIST vol.7(9), pp.42-56, July 2025
+// Classifiers: RF (100 trees), SVM (RBF), k-NN (k=5)
+// Acquisition: 12-Sep-2024 & 21-Sep-2024 (mosaicked)
+// ============================================================
+
+var gilgit = ee.FeatureCollection("your path");
+
+// Landsat-8 OLI — September 2024 (two tiles mosaicked)
+var landsat = ee.ImageCollection('LANDSAT/LC08/C02/T1_L2')
+    .filterBounds(gilgit)
+    .filterDate('2024-09-01', '2024-09-30')
+    .filter(ee.Filter.lt('CLOUD_COVER', 7))
+    .median()
+    .clip(gilgit);
+
+// Apply scaling factors (USGS Collection 2 L2)
+var bands = ['SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B6', 'SR_B7'];
+var image = landsat.select(bands)
+    .multiply(0.0000275)
+    .add(-0.2)
+    .rename(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']);
+
+var bandNames = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2'];
+
+Map.centerObject(gilgit, 9);
+Map.addLayer(image, {bands: ['Red', 'Green', 'Blue'], min: 0, max: 0.3, gamma: 1.4}, 'Landsat-8 True Color');
+Map.setOptions('SATELLITE');
+
+// ── CLASS LABELS ──────────────────────────────────────────
+// Draw training polygons manually in GEE UI for each class:
+// rock_soil, grass_shrub, forest, cropland, builtup, snow_glacier, water
+// Then assign class property as below:
+
+var classProperty = 'lulc_class';
+
+// Merge all training samples (drawn in GEE UI)
+// Each class assigned integer label 0–6
+var trainingData = rock_soil.map(function(f){ return f.set(classProperty, 0); })
+  .merge(grass_shrub.map(function(f){ return f.set(classProperty, 1); }))
+  .merge(forest.map(function(f){      return f.set(classProperty, 2); }))
+  .merge(cropland.map(function(f){    return f.set(classProperty, 3); }))
+  .merge(builtup.map(function(f){     return f.set(classProperty, 4); }))
+  .merge(snow_glacier.map(function(f){return f.set(classProperty, 5); }))
+  .merge(water.map(function(f){       return f.set(classProperty, 6); }));
+
+// Sample image at training points
+var samples = image.sampleRegions({
+  collection: trainingData,
+  properties: [classProperty],
+  scale: 30
+});
+
+// 70/30 stratified split
+var split = 0.7;
+var withRandom = samples.randomColumn('random');
+var trainSamples = withRandom.filter(ee.Filter.lt('random', split));
+var valSamples   = withRandom.filter(ee.Filter.gte('random', split));
+
+// ── RANDOM FOREST (100 trees, paper default) ──────────────
+var rfClassifier = ee.Classifier.smileRandomForest(100).train({
+  features: trainSamples,
+  classProperty: classProperty,
+  inputProperties: bandNames
+});
+var rfClassified = image.classify(rfClassifier);
+
+// ── SVM (RBF kernel, gamma=10, cost=20 — paper params) ───
+var svmClassifier = ee.Classifier.libsvm({
+  kernelType: 'RBF',
+  gamma: 10,
+  cost: 20
+}).train({
+  features: trainSamples,
+  classProperty: classProperty,
+  inputProperties: bandNames
+});
+var svmClassified = image.classify(svmClassifier);
+
+// ── k-NN (k=5 — paper default) ───────────────────────────
+var knnClassifier = ee.Classifier.smileKNN(5).train({
+  features: trainSamples,
+  classProperty: classProperty,
+  inputProperties: bandNames
+});
+var knnClassified = image.classify(knnClassifier);
+
+// ── VISUALIZATION ─────────────────────────────────────────
+// 0:Rock, 1:Grass, 2:Forest, 3:Cropland, 4:Built-up, 5:Snow, 6:Water
+var palette = ['#C2B280', '#90EE90', '#228B22', '#DAA520', '#FF4500', '#FFFFFF', '#1E90FF'];
+var visParams = {min: 0, max: 6, palette: palette};
+
+Map.addLayer(rfClassified,  visParams, 'RF Classification');
+Map.addLayer(svmClassified, visParams, 'SVM Classification');
+Map.addLayer(knnClassified, visParams, 'k-NN Classification');
+
+// ── ACCURACY ASSESSMENT ───────────────────────────────────
+var rfVal  = rfClassified.sampleRegions({collection: valSamples, properties: [classProperty], scale: 30});
+var svmVal = svmClassified.sampleRegions({collection: valSamples, properties: [classProperty], scale: 30});
+var knnVal = knnClassified.sampleRegions({collection: valSamples, properties: [classProperty], scale: 30});
+
+var rfMatrix  = rfVal.errorMatrix(classProperty, 'classification');
+var svmMatrix = svmVal.errorMatrix(classProperty, 'classification');
+var knnMatrix = knnVal.errorMatrix(classProperty, 'classification');
+
+print('RF  — OA:', rfMatrix.accuracy(),  '| Kappa:', rfMatrix.kappa());
+print('SVM — OA:', svmMatrix.accuracy(), '| Kappa:', svmMatrix.kappa());
+print('k-NN— OA:', knnMatrix.accuracy(), '| Kappa:', knnMatrix.kappa());
+
+// ── EXPORT ────────────────────────────────────────────────
+Export.image.toDrive({
+  image: rfClassified,
+  description: 'Landsat8_RF_LULC_Gilgit_Sep2024',
+  scale: 30,
+  region: gilgit.geometry(),
+  fileFormat: 'GeoTIFF',
+  maxPixels: 1e13
+});
+
+Export.image.toDrive({
+  image: svmClassified,
+  description: 'Landsat8_SVM_LULC_Gilgit_Sep2024',
+  scale: 30,
+  region: gilgit.geometry(),
+  fileFormat: 'GeoTIFF',
+  maxPixels: 1e13
+});
+
+Export.image.toDrive({
+  image: knnClassified,
+  description: 'Landsat8_kNN_LULC_Gilgit_Sep2024',
+  scale: 30,
+  region: gilgit.geometry(),
+  fileFormat: 'GeoTIFF',
+  maxPixels: 1e13
+});
+
+
+// ============================================================
+// Pixel-based LULC Classification — Sentinel-2 MSI L2A
+// Study Area: Gilgit District, Pakistan
+// Paper: Rehman et al., IJIST vol.7(9), pp.42-56, July 2025
+// Classifiers: RF (100 trees), SVM (RBF), k-NN (k=5)
+// Acquisition: 21-September-2024
+// ============================================================
+
+var gilgit = ee.FeatureCollection("your path");
+
+// Sentinel-2 MSI Level-2A — 21 September 2024
+var sentinel2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
+    .filterBounds(gilgit)
+    .filterDate('2024-09-01', '2024-09-30')
+    .filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 7))
+    .median()
+    .clip(gilgit);
+
+// Select bands matching paper: B2,B3,B4,B8,B11,B12
+// Scale factor for S2 SR: divide by 10000
+var bands = ['B2', 'B3', 'B4', 'B8', 'B11', 'B12'];
+var image = sentinel2.select(bands)
+    .divide(10000)
+    .rename(['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2']);
+
+var bandNames = ['Blue', 'Green', 'Red', 'NIR', 'SWIR1', 'SWIR2'];
+
+Map.centerObject(gilgit, 9);
+Map.addLayer(image, {bands: ['Red', 'Green', 'Blue'], min: 0, max: 0.3, gamma: 1.4}, 'Sentinel-2 True Color');
+Map.setOptions('SATELLITE');
+
+// ── CLASS LABELS (same as Landsat script) ─────────────────
+var classProperty = 'lulc_class';
+
+var trainingData = rock_soil.map(function(f){ return f.set(classProperty, 0); })
+  .merge(grass_shrub.map(function(f){ return f.set(classProperty, 1); }))
+  .merge(forest.map(function(f){      return f.set(classProperty, 2); }))
+  .merge(cropland.map(function(f){    return f.set(classProperty, 3); }))
+  .merge(builtup.map(function(f){     return f.set(classProperty, 4); }))
+  .merge(snow_glacier.map(function(f){return f.set(classProperty, 5); }))
+  .merge(water.map(function(f){       return f.set(classProperty, 6); }));
+
+// Sample at 10m resolution (Sentinel-2 native)
+var samples = image.sampleRegions({
+  collection: trainingData,
+  properties: [classProperty],
+  scale: 10
+});
+
+var withRandom  = samples.randomColumn('random');
+var trainSamples = withRandom.filter(ee.Filter.lt('random', 0.7));
+var valSamples   = withRandom.filter(ee.Filter.gte('random', 0.7));
+
+// ── CLASSIFIERS ───────────────────────────────────────────
+var rfClassifier = ee.Classifier.smileRandomForest(100).train({
+  features: trainSamples, classProperty: classProperty, inputProperties: bandNames
+});
+
+var svmClassifier = ee.Classifier.libsvm({
+  kernelType: 'RBF', gamma: 10, cost: 20
+}).train({
+  features: trainSamples, classProperty: classProperty, inputProperties: bandNames
+});
+
+var knnClassifier = ee.Classifier.smileKNN(5).train({
+  features: trainSamples, classProperty: classProperty, inputProperties: bandNames
+});
+
+var rfClassified  = image.classify(rfClassifier);
+var svmClassified = image.classify(svmClassifier);
+var knnClassified = image.classify(knnClassifier);
+
+// ── VISUALIZATION ─────────────────────────────────────────
+var palette = ['#C2B280', '#90EE90', '#228B22', '#DAA520', '#FF4500', '#FFFFFF', '#1E90FF'];
+var visParams = {min: 0, max: 6, palette: palette};
+
+Map.addLayer(rfClassified,  visParams, 'S2 RF Classification');
+Map.addLayer(svmClassified, visParams, 'S2 SVM Classification');
+Map.addLayer(knnClassified, visParams, 'S2 k-NN Classification');
+
+// ── ACCURACY ASSESSMENT ───────────────────────────────────
+var rfMatrix  = rfClassified.sampleRegions({collection: valSamples, properties: [classProperty], scale: 10}).errorMatrix(classProperty, 'classification');
+var svmMatrix = svmClassified.sampleRegions({collection: valSamples, properties: [classProperty], scale: 10}).errorMatrix(classProperty, 'classification');
+var knnMatrix = knnClassified.sampleRegions({collection: valSamples, properties: [classProperty], scale: 10}).errorMatrix(classProperty, 'classification');
+
+print('S2 RF  — OA:', rfMatrix.accuracy(),  '| Kappa:', rfMatrix.kappa());
+print('S2 SVM — OA:', svmMatrix.accuracy(), '| Kappa:', svmMatrix.kappa());
+print('S2 k-NN— OA:', knnMatrix.accuracy(), '| Kappa:', knnMatrix.kappa());
+
+// ── EXPORT ────────────────────────────────────────────────
+Export.image.toDrive({
+  image: knnClassified,
+  description: 'S2_kNN_LULC_Gilgit_Sep2024',
+  scale: 10,
+  region: gilgit.geometry(),
+  fileFormat: 'GeoTIFF',
+  maxPixels: 1e13
+});
