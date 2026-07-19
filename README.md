@@ -78,7 +78,7 @@ September was chosen to avoid monsoon cloud cover and fresh snow effects on clas
 **Mati ur Rehman**, Syed Aun Abbas, Abdul Wahab Shah, Raja Tashfeen Muqarrab, Dur E Najaf Raza, Sawaid Abbas.  
 *Assessing the Efficacy of Pixel-based and Object-based Classification Techniques and Classifiers for Land Cover Mapping Using Landsat-8 and Sentinel-2 Data in Complex Mountainous Terrain.*  
 **International Journal of Innovations in Science & Technology**, vol. 7(9), pp. 42–56, July 2025.  
-[Read Paper](https://journal.50sea.com/index.php/IJIST/article/view/1482/2056)
+[Read Paper](https://www.researchgate.net/publication/408917607_Assessing_the_Efficacy_of_Pixel-based_and_Object-based_Classification_Techniques_and_Classifiers_for_Land_Cover_Mapping_Using_Landsat-8_and_Sentinel-2_Data_in_Complex_Mountainous_Terrain)
 
 ---
 
